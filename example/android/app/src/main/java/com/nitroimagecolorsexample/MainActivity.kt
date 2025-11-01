@@ -1,4 +1,4 @@
-package nitroimagecolors.example
+package com.nitroimagecolorsexample
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
