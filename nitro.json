@@ -1,0 +1,17 @@
+{
+  "cxxNamespace": ["nitroimagecolors"],
+  "ios": {
+    "iosModuleName": "NitroImageColors"
+  },
+  "android": {
+    "androidNamespace": ["nitroimagecolors"],
+    "androidCxxLibName": "nitroimagecolors"
+  },
+  "autolinking": {
+    "NitroImageColors": {
+      "swift": "NitroImageColors",
+      "kotlin": "NitroImageColors"
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}
