@@ -9,10 +9,21 @@ import type {
 const NitroImageColorsHybridObject =
   NitroModules.createHybridObject<NitroImageColors>('NitroImageColors');
 
+const defaultConfig: Config = {
+  cache: true,
+  fallback: '#000000',
+  headers: {},
+  key: '',
+  pixelSpacing: 1,
+};
+
 export function getColors(
   uri: number | ImageSourcePropType,
-  config?: Config
+  config: Partial<Config> = {}
 ): Promise<ImageColors> {
-  return NitroImageColorsHybridObject.getColors(uri, config);
+  return NitroImageColorsHybridObject.getColors(uri, {
+    ...defaultConfig,
+    ...config,
+  });
 }
 export type * from './NitroImageColors.nitro';
