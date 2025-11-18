@@ -22,7 +22,7 @@ class NitroImageColors: HybridNitroImageColorsSpec {
   }
 
   private func extractDominantColors(from image: UIImage) -> (background: UIColor, primary: UIColor, secondary: UIColor, detail: UIColor) {
-    guard let cgImage = image.cgImage else {
+     guard image.cgImage != nil else {
       return (UIColor.black, UIColor.black, UIColor.black, UIColor.black)
     }
     
@@ -206,7 +206,7 @@ class NitroImageColors: HybridNitroImageColorsSpec {
           darkMuted: nil,
           lightMuted: nil,
           muted: nil,
-          platform: .ios
+          platform: "ios"
         )
       }
       
@@ -225,7 +225,7 @@ class NitroImageColors: HybridNitroImageColorsSpec {
         darkMuted: nil,
         lightMuted: nil,
         muted: nil,
-        platform: .ios
+        platform: "ios"
       )
       
       if config?.cache == true {
