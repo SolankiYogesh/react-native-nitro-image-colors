@@ -139,6 +139,7 @@
     },
     "plugins": {
       "@release-it/conventional-changelog": {
+        "whatBump": false,
         "preset": {
           "name": "angular"
         }
