@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import NitroModules
-import React
 
 class NitroImageColors: HybridNitroImageColorsSpec {
   private static var cache: [String: ImageColors] = [:]
@@ -13,16 +12,24 @@ class NitroImageColors: HybridNitroImageColorsSpec {
     return String(format: "#%02X%02X%02X", Int(r*255), Int(g*255), Int(b*255))
   }
 
-  private func adjustColor(_ color: UIColor, amount: CGFloat) -> UIColor {
+  private func adjustBrightness(_ color: UIColor, amount: CGFloat) -> UIColor {
     var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
     if color.getHue(&h, saturation: &s, brightness: &b, alpha: &a) {
       return UIColor(hue: h, saturation: s, brightness: max(0, min(1, b + amount)), alpha: a)
     }
     return color
   }
+  
+  private func adjustSaturation(_ color: UIColor, amount: CGFloat) -> UIColor {
+    var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    if color.getHue(&h, saturation: &s, brightness: &b, alpha: &a) {
+      return UIColor(hue: h, saturation: max(0, min(1, s + amount)), brightness: b, alpha: a)
+    }
+    return color
+  }
 
-  private func extractDominantColors(from image: UIImage) -> (background: UIColor, primary: UIColor, secondary: UIColor, detail: UIColor) {
-     guard image.cgImage != nil else {
+  private func extractColorsFromImage(_ image: UIImage) -> (background: UIColor, primary: UIColor, secondary: UIColor, detail: UIColor) {
+    guard let cgImage = image.cgImage else {
       return (UIColor.black, UIColor.black, UIColor.black, UIColor.black)
     }
     
@@ -41,7 +48,7 @@ class NitroImageColors: HybridNitroImageColorsSpec {
     var pixelData = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
     
     let colorSpace = CGColorSpaceCreateDeviceRGB()
-    let context = CGContext(
+    guard let context = CGContext(
       data: &pixelData,
       width: width,
       height: height,
@@ -49,9 +56,11 @@ class NitroImageColors: HybridNitroImageColorsSpec {
       bytesPerRow: bytesPerRow,
       space: colorSpace,
       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    )
+    ) else {
+      return (UIColor.black, UIColor.black, UIColor.black, UIColor.black)
+    }
     
-    context?.draw(resizedCGImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+    context.draw(resizedCGImage, in: CGRect(x: 0, y: 0, width: width, height: height))
     
     var colorCounts: [String: Int] = [:]
     var totalPixels = 0
@@ -59,8 +68,10 @@ class NitroImageColors: HybridNitroImageColorsSpec {
     var greenSum: CGFloat = 0
     var blueSum: CGFloat = 0
     
-    for y in 0..<height {
-      for x in 0..<width {
+    let pixelSpacing = 1
+    
+    for y in stride(from: 0, to: height, by: pixelSpacing) {
+      for x in stride(from: 0, to: width, by: pixelSpacing) {
         let pixelIndex = (y * width + x) * bytesPerPixel
         let red = CGFloat(pixelData[pixelIndex]) / 255.0
         let green = CGFloat(pixelData[pixelIndex + 1]) / 255.0
@@ -69,6 +80,7 @@ class NitroImageColors: HybridNitroImageColorsSpec {
         
         if alpha < 0.5 { continue }
         
+        // Quantize colors to reduce noise
         let quantizedRed = Int(red * 8) * 32
         let quantizedGreen = Int(green * 8) * 32
         let quantizedBlue = Int(blue * 8) * 32
@@ -83,18 +95,19 @@ class NitroImageColors: HybridNitroImageColorsSpec {
       }
     }
     
+    // Calculate average color (background)
     let avgRed = totalPixels > 0 ? redSum / CGFloat(totalPixels) : 0
     let avgGreen = totalPixels > 0 ? greenSum / CGFloat(totalPixels) : 0
     let avgBlue = totalPixels > 0 ? blueSum / CGFloat(totalPixels) : 0
     let backgroundColor = UIColor(red: avgRed, green: avgGreen, blue: avgBlue, alpha: 1.0)
     
+    // Find dominant colors
     let sortedColors = colorCounts.sorted { $0.value > $1.value }
     
     var primaryColor = backgroundColor
     var secondaryColor = backgroundColor
-    var detailColor = backgroundColor
     
-    if sortedColors.count > 0 {
+    if !sortedColors.isEmpty {
       let primaryComponents = sortedColors[0].key.split(separator: ",")
       if primaryComponents.count == 3 {
         primaryColor = UIColor(
@@ -118,7 +131,8 @@ class NitroImageColors: HybridNitroImageColorsSpec {
       }
     }
     
-    detailColor = adjustColor(primaryColor, amount: 0.3)
+    // Detail color is a darker version of primary
+    let detailColor = adjustBrightness(primaryColor, amount: -0.3)
     
     return (backgroundColor, primaryColor, secondaryColor, detailColor)
   }
@@ -134,16 +148,25 @@ class NitroImageColors: HybridNitroImageColorsSpec {
   private func loadImage(from uri: Variant_Double_ImageSourcePropType, config: Config?) async -> UIImage? {
     switch uri {
     case let .first(resourceId):
+      // Handle resource ID - try different naming patterns
       let resourceName = "image_\(Int(resourceId))"
-      return UIImage(named: resourceName)
+      if let image = UIImage(named: resourceName) {
+        return image
+      }
+      // Try direct resource ID
+      return UIImage(named: String(Int(resourceId)))
       
     case let .second(source):
-      let uri = source.uri
+      let uriString = source.uri
       
-      if uri.hasPrefix("http://") || uri.hasPrefix("https://") {
-        guard let url = URL(string: uri) else { return nil }
+      if uriString.hasPrefix("http://") || uriString.hasPrefix("https://") {
+        // Remote URL
+        guard let url = URL(string: uriString) else { return nil }
         
         var request = URLRequest(url: url)
+        request.timeoutInterval = 30.0
+        
+        // Add custom headers
         if let headers = config?.headers {
           for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
@@ -151,18 +174,28 @@ class NitroImageColors: HybridNitroImageColorsSpec {
         }
         
         do {
-          let (data, _) = try await URLSession.shared.data(for: request)
+          let (data, response) = try await URLSession.shared.data(for: request)
+          
+          // Check response status
+          if let httpResponse = response as? HTTPURLResponse,
+             httpResponse.statusCode >= 400 {
+            return nil
+          }
+          
           return UIImage(data: data)
         } catch {
           return nil
         }
-      } else if uri.hasPrefix("file://") {
-        let path = String(uri.dropFirst(7))
+      } else if uriString.hasPrefix("file://") {
+        // Local file URL
+        let path = String(uriString.dropFirst(7))
         return UIImage(contentsOfFile: path)
-      } else if FileManager.default.fileExists(atPath: uri) {
-        return UIImage(contentsOfFile: uri)
+      } else if uriString.hasPrefix("/") {
+        // Absolute file path
+        return UIImage(contentsOfFile: uriString)
       } else {
-        return UIImage(named: uri)
+        // Try as bundle resource
+        return UIImage(named: uriString)
       }
     }
   }
@@ -171,6 +204,7 @@ class NitroImageColors: HybridNitroImageColorsSpec {
     return NitroModules.Promise.async {
       let fallbackHex = config?.fallback ?? "#000000"
       
+      // Generate cache key
       let cacheKey: String
       if let customKey = config?.key {
         cacheKey = customKey
@@ -183,6 +217,7 @@ class NitroImageColors: HybridNitroImageColorsSpec {
         }
       }
       
+      // Check cache if enabled
       if config?.cache == true {
         let cachedResult = Self.cacheQueue.sync {
           return Self.cache[cacheKey]
@@ -192,8 +227,9 @@ class NitroImageColors: HybridNitroImageColorsSpec {
         }
       }
       
+      // Load image
       guard let image = await self.loadImage(from: uri, config: config) else {
-        return ImageColors(
+        let fallbackResult = ImageColors(
           background: fallbackHex,
           primary: fallbackHex,
           secondary: fallbackHex,
@@ -208,9 +244,19 @@ class NitroImageColors: HybridNitroImageColorsSpec {
           muted: nil,
           platform: "ios"
         )
+        
+        // Cache fallback result if caching is enabled
+        if config?.cache == true {
+          Self.cacheQueue.async(flags: .barrier) {
+            Self.cache[cacheKey] = fallbackResult
+          }
+        }
+        
+        return fallbackResult
       }
       
-      let colors = self.extractDominantColors(from: image)
+      // Extract colors
+      let colors = self.extractColorsFromImage(image)
       
       let result = ImageColors(
         background: self.hexString(from: colors.background),
@@ -228,6 +274,7 @@ class NitroImageColors: HybridNitroImageColorsSpec {
         platform: "ios"
       )
       
+      // Cache result if enabled
       if config?.cache == true {
         Self.cacheQueue.async(flags: .barrier) {
           Self.cache[cacheKey] = result
