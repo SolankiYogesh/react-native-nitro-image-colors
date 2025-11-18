@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-image-colors",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "High-performance React Native library for extracting prominent colors from images. Built with Nitro Modules for optimal performance on iOS and Android with smart caching and TypeScript support.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
