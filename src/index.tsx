@@ -14,7 +14,9 @@ const defaultConfig: Config = {
   fallback: '#000000',
   headers: {},
   key: '',
-  pixelSpacing: 1,
+  // Matches the documented default (see README) — sampling every pixel is
+  // significantly slower with negligible accuracy benefit.
+  pixelSpacing: 5,
 };
 
 export function getColors(
@@ -26,4 +28,20 @@ export function getColors(
     ...config,
   });
 }
+
+/**
+ * Clears every entry from the native in-memory color cache.
+ */
+export function clearCache(): void {
+  NitroImageColorsHybridObject.clearCache();
+}
+
+/**
+ * Sets the maximum number of entries kept in the native in-memory cache.
+ * Once exceeded, the oldest entries are evicted first. Default: 100.
+ */
+export function setMaxCacheSize(size: number): void {
+  NitroImageColorsHybridObject.setMaxCacheSize(size);
+}
+
 export type * from './NitroImageColors.nitro';

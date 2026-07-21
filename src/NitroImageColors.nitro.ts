@@ -33,8 +33,10 @@ export interface Config {
 
   /**
    * Custom cache key.
-   * If not set, the image URI is used.
-   * Required if URI length > 500 characters.
+   * If not set, the image URI is used. URIs longer than 500 characters are
+   * hashed (SHA-256) automatically to avoid cache-key collisions, so setting
+   * a custom key is optional (but recommended if you want a human-readable
+   * or content-addressable key).
    */
   key: string;
 }
@@ -67,8 +69,10 @@ export interface ImageColors {
 /**
  * Nitro native module for image color extraction.
  */
-export interface NitroImageColors
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+export interface NitroImageColors extends HybridObject<{
+  ios: 'swift';
+  android: 'kotlin';
+}> {
   /**
    * Extracts main colors from an image.
    *
@@ -80,4 +84,16 @@ export interface NitroImageColors
     uri: number | ImageSourcePropType,
     config?: Config
   ): Promise<ImageColors>;
+
+  /**
+   * Clears every entry from the native in-memory color cache.
+   */
+  clearCache(): void;
+
+  /**
+   * Sets the maximum number of entries kept in the native in-memory cache.
+   * When the limit is exceeded, the oldest entries are evicted first.
+   * Default: 100.
+   */
+  setMaxCacheSize(size: number): void;
 }
