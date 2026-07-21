@@ -9,10 +9,10 @@ A high-performance React Native library for extracting prominent colors from ima
 
 ## ✨ Features
 
-- **🚀 High Performance**: Native implementation using Kotlin and Swift
+- **🚀 High Performance**: Native implementation using Kotlin and Swift, decoding images as downsampled thumbnails instead of at full resolution
 - **🎯 Accurate Color Extraction**: Advanced algorithms for precise color detection
-- **📱 Cross-Platform**: Consistent API across iOS and Android
-- **🔄 Smart Caching**: Built-in caching to avoid reprocessing
+- **📱 Cross-Platform**: Same color swatch set (dominant, average, vibrant, muted, and their dark/light variants) returned on both iOS and Android
+- **🔄 Smart Caching**: Bounded, evictable in-memory cache that never caches failures — with `clearCache()` and `setMaxCacheSize()` to control it
 - **🎨 Rich Color Palette**: Extract multiple color variants (dominant, vibrant, muted, etc.)
 - **⚡ Lightweight**: Minimal bundle size impact
 - **🔧 TypeScript Support**: Full TypeScript definitions included
@@ -172,6 +172,27 @@ Extracts prominent colors from an image.
 
 `Promise<ImageColors>` - Object containing extracted colors
 
+### `clearCache()`
+
+Clears every entry from the native in-memory color cache, on the current platform.
+
+```typescript
+import { clearCache } from 'react-native-nitro-image-colors';
+
+clearCache();
+```
+
+### `setMaxCacheSize(size)`
+
+Sets the maximum number of entries kept in the native in-memory cache. Once the
+limit is exceeded, the oldest entries are evicted first. Default: `100`.
+
+```typescript
+import { setMaxCacheSize } from 'react-native-nitro-image-colors';
+
+setMaxCacheSize(200);
+```
+
 ### Configuration Options
 
 | Option         | Type                     | Default     | Description                        |
@@ -184,16 +205,11 @@ Extracts prominent colors from an image.
 
 ### ImageColors Response
 
-The returned object contains platform-specific color properties:
-
-#### iOS Colors
-
-- `background`: Primary background color
-- `primary`: Main primary color
-- `secondary`: Secondary accent color
-- `detail`: Detail/text color
-
-#### Android Colors
+`dominant`, `average`, `vibrant`, `darkVibrant`, `lightVibrant`, `muted`, `darkMuted`
+and `lightMuted` are computed **on both platforms** using a Palette-style
+saturation/lightness bucketing approach (Android uses `androidx.palette`; iOS
+uses an equivalent custom bucketing algorithm), so code written against this
+swatch set works the same on iOS and Android.
 
 - `dominant`: Most frequent color
 - `average`: Average color of the image
@@ -204,9 +220,51 @@ The returned object contains platform-specific color properties:
 - `lightMuted`: Light muted variant
 - `muted`: Muted color variant
 
+#### iOS-only Colors
+
+iOS additionally returns its own custom-algorithm swatches:
+
+- `background`: Primary background color
+- `primary`: Main primary color
+- `secondary`: Secondary accent color
+- `detail`: Detail/text color
+
 #### Common Property
 
 - `platform`: `'ios' | 'android'` - Platform where colors were extracted
+
+If extraction fails (bad URI, network error, decode failure, etc.), every one
+of the fields above is filled with `config.fallback` (default `'#000000'`) on
+both platforms, so consumers don't need platform-specific null-checks on
+failure vs. success.
+
+## 💾 Caching Behavior
+
+When `cache: true` (the default), successful results are stored in a native,
+in-memory, per-platform cache keyed by (in priority order):
+
+1. `config.key`, if you provide a non-empty custom key.
+2. The image URI itself, if it's 500 characters or shorter.
+3. A SHA-256 hash of the URI, if it's longer than 500 characters — long URIs
+   are hashed rather than truncated, so two different URLs that happen to
+   share a long common prefix will never collide on the same cache entry.
+
+The cache is:
+
+- **Bounded** — capped at `100` entries by default; call `setMaxCacheSize(n)`
+  to change the limit. Once the limit is exceeded, the oldest entries are
+  evicted first.
+- **Failure-safe** — failed/fallback results (e.g. a transient network error)
+  are never cached, so a temporary blip can't permanently "stick" for that
+  key until app restart.
+- **Clearable** — call `clearCache()` at any time to drop every cached entry.
+
+```typescript
+import { clearCache, setMaxCacheSize } from 'react-native-nitro-image-colors';
+
+setMaxCacheSize(200); // raise the cap (default: 100)
+clearCache(); // e.g. on logout, or after a memory warning
+```
 
 ## 🔧 TypeScript Support
 
@@ -242,7 +300,7 @@ try {
 // Use caching for better performance
 const config: Config = {
   cache: true,
-  key: 'unique-image-key', // Required for long URIs
+  key: 'unique-image-key', // Optional — long URIs are hashed automatically
 };
 ```
 
