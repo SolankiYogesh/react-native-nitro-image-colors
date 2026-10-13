@@ -9,8 +9,8 @@
   },
   "autolinking": {
     "NitroImageColors": {
-      "swift": "NitroImageColors",
-      "kotlin": "NitroImageColors"
+      "ios": { "language": "swift", "implementationClassName": "NitroImageColors" },
+      "android": { "language": "kotlin", "implementationClassName": "NitroImageColors" }
     }
   },
   "ignorePaths": ["node_modules"]

@@ -136,7 +136,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <Text style={styles.title}>Nitro Image Colors</Text>
         <Text style={styles.subtitle}>
